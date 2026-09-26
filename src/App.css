@@ -1,5 +1,7 @@
 ﻿.app-shell { width: min(1280px, calc(100% - 48px)); margin: 48px auto; }
 header { margin-bottom: 32px; }
+.knowledge-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.knowledge-account { display: flex; align-items: center; gap: 12px; color: #64748b; font-size: 12px; }
 h1 { font-size: clamp(2rem, 4vw, 2.8rem); letter-spacing: -.04em; margin: 8px 0; }
 h2 { font-size: 1.2rem; margin: 12px 0 8px; }
 p { color: #64748b; margin: 0 0 20px; }
@@ -43,8 +45,12 @@ td { overflow-wrap: anywhere; }
 .supervisor-badge { display: inline-block; border-radius: 6px; padding: 6px 10px; background: #fef3c7; color: #92400e; font-size: .85rem; font-weight: 700; }
 .agent-status { display: block; color: #475569; font-size: .85rem; margin: 8px 0 0; }
 .agent-status:empty { display: none; }
+.auth-loading { min-height: 100vh; display: flex; align-items: center; justify-content: center; gap: 12px; color: #53685f; font-size: 13px; }
+.auth-loading span { width: 18px; height: 18px; border: 2px solid #cbd9d1; border-top-color: #245b47; border-radius: 50%; animation: auth-spin .7s linear infinite; }
+.forbidden-page { max-width: 620px; padding-top: 15vh; }
+@keyframes auth-spin { to { transform: rotate(360deg); } }
 @media (max-width: 900px) { .forms { grid-template-columns: 1fr; } }
-@media (max-width: 540px) { .app-shell { width: calc(100% - 24px); margin: 24px auto; } .panel { padding: 18px; } }
+@media (max-width: 540px) { .app-shell { width: calc(100% - 24px); margin: 24px auto; } .panel { padding: 18px; } .knowledge-header { flex-direction: column; } .knowledge-account { width: 100%; justify-content: space-between; } }
 
 /* Agent workspace */
 .agent-dashboard { min-height: 100vh; display: flex; background: #f7f9f8; color: #203c36; }

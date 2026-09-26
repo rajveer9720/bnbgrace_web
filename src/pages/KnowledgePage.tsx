@@ -1,12 +1,17 @@
 import { useState } from 'react'
 import { useAddQa, useAddUrl, useKnowledgeList, useUploadDoc } from '../hooks/useKnowledge'
+import { useAuth } from '../auth/authContext'
+
+const MAX_PDF_SIZE = 20_000_000
 
 export default function KnowledgePage() {
+  const { user, logout } = useAuth()
   const upload = useUploadDoc()
   const addUrl = useAddUrl()
   const addQa = useAddQa()
   const list = useKnowledgeList()
   const [notice, setNotice] = useState('')
+  const [fileError, setFileError] = useState('')
 
   async function finish(success: boolean, form: HTMLFormElement, message: string) {
     if (!success) return
@@ -17,7 +22,7 @@ export default function KnowledgePage() {
 
   return (
     <main className="app-shell">
-      <header><p className="eyebrow">BNBGRACE / ADMIN</p><h1>Knowledge base</h1><p>Add the information your assistant needs to help your guests.</p><a href="/agent">Back to reply assistant →</a></header>
+      <header className="knowledge-header"><div><p className="eyebrow">BNBGRACE / ADMIN</p><h1>Knowledge base</h1><p>Add the information your assistant needs to help your guests.</p><a href="/agent">Back to reply assistant →</a></div><div className="knowledge-account"><span>{user?.email}</span><button type="button" className="secondary" onClick={logout}>Log out</button></div></header>
       {notice && <div className="notice" role="status">{notice}</div>}
       <section className="forms" aria-label="Add knowledge">
         <form className="panel" onSubmit={async (event) => {
@@ -26,10 +31,17 @@ export default function KnowledgePage() {
           const form = event.currentTarget
           const file = new FormData(form).get('file')
           if (!(file instanceof File) || !file.size) { setNotice('Select a non-empty PDF file.'); return }
-          await finish(await upload.mutate(file), form, 'Document uploaded.')
+          if (file.size > MAX_PDF_SIZE) { setFileError('PDF must be 20 MB or smaller.'); return }
+          setFileError('')
+          const success = await upload.mutate(file)
+          await finish(success, form, 'Document uploaded.')
         }}>
-          <span className="eyebrow">01 / DOCUMENT</span><h2>Upload a file</h2><p>Add a PDF with useful information.</p>
-          <label>Document<input name="file" type="file" accept=".pdf,application/pdf" required disabled={upload.isPending} /></label>
+          <span className="eyebrow">01 / DOCUMENT</span><h2>Upload a file</h2><p>Add a text-based PDF up to 20 MB.</p>
+          <label>Document<input name="file" type="file" accept=".pdf,application/pdf" required disabled={upload.isPending} onChange={(event) => {
+            const file = event.currentTarget.files?.[0]
+            setFileError(file && file.size > MAX_PDF_SIZE ? 'PDF must be 20 MB or smaller.' : '')
+          }} /></label>
+          {fileError && <p className="error" role="alert">{fileError}</p>}
           {upload.error && <p className="error" role="alert">{upload.error}</p>}
           <button disabled={upload.isPending}>{upload.isPending ? 'Uploading…' : 'Upload document'}</button>
         </form>

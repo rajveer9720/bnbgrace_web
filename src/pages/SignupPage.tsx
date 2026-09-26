@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useAuth } from "../auth/authContext";
-import "./LoginPage.css";
+import AuthLayout from "../components/auth/AuthLayout";
+import AuthField from "../components/auth/AuthField";
 
 export default function SignupPage() {
   const { registerAgent } = useAuth();
@@ -38,76 +39,61 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="login-page">
-      <section className="login-card">
-        <a className="login-brand" href="/login">
-          <span>✦</span> bnbgrace <small>AI</small>
-        </a>
-        <div className="login-heading">
-          <p>AGENT SIGNUP</p>
-          <h1>Create your agent account</h1>
-          <span>Join the workspace and start helping guests.</span>
-        </div>
-        <form onSubmit={submit} aria-busy={isLoading}>
-          <label htmlFor="signup-email">Email address</label>
-          <input
-            id="signup-email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            placeholder="agent@example.com"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            disabled={isLoading}
-            required
-          />
-          <label htmlFor="signup-password">Password</label>
-          <input
-            id="signup-password"
-            name="password"
-            type="password"
-            autoComplete="new-password"
-            placeholder="At least 8 characters"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            disabled={isLoading}
-            minLength={8}
-            required
-          />
-          <label htmlFor="signup-confirm-password">Confirm password</label>
-          <input
-            id="signup-confirm-password"
-            name="confirmPassword"
-            type="password"
-            autoComplete="new-password"
-            placeholder="Enter password again"
-            value={confirmPassword}
-            onChange={(event) => setConfirmPassword(event.target.value)}
-            disabled={isLoading}
-            minLength={8}
-            required
-          />
-          {error && (
-            <p className="login-error" role="alert">
-              {error}
-            </p>
-          )}
-          <button
-            type="submit"
-            disabled={
-              isLoading || !email.trim() || !password || !confirmPassword
-            }
-          >
-            {isLoading ? "Creating account…" : "Create agent account"}
-          </button>
-        </form>
-        <p className="login-switch">
-          Already have an account? <a href="/login">Sign in</a>
-        </p>
-        <p className="login-footnote">
-          New accounts are created with agent access.
-        </p>
-      </section>
-    </main>
+    <AuthLayout eyebrow="AGENT SIGNUP"
+      title="Create your agent account"
+      description="Join the workspace and start helping guests."
+      switchPrompt={<>Already have an account? <a href="/login">Sign in</a></>}
+      footnote="New accounts are created with agent access.">
+      <form onSubmit={submit} aria-busy={isLoading}>
+        <AuthField label="Email address"
+          id="signup-email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          placeholder="agent@example.com"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          disabled={isLoading}
+          required
+        />
+        <AuthField label="Password"
+          id="signup-password"
+          name="password"
+          type="password"
+          autoComplete="new-password"
+          placeholder="At least 8 characters"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          disabled={isLoading}
+          minLength={8}
+          required
+        />
+        <AuthField label="Confirm password"
+          id="signup-confirm-password"
+          name="confirmPassword"
+          type="password"
+          autoComplete="new-password"
+          placeholder="Enter password again"
+          value={confirmPassword}
+          onChange={(event) => setConfirmPassword(event.target.value)}
+          disabled={isLoading}
+          minLength={8}
+          required
+        />
+        {error && (
+          <p className="login-error" role="alert">
+            {error}
+          </p>
+        )}
+        <button
+          type="submit"
+          disabled={
+            isLoading || !email.trim() || !password || !confirmPassword
+          }
+        >
+          {isLoading ? "Creating account…" : "Create agent account"}
+        </button>
+      </form>
+    </AuthLayout>
   );
 }

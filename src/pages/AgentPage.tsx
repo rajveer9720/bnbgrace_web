@@ -1,246 +1,33 @@
-import { useEffect, useRef, useState } from "react";
-import type { FormEvent } from "react";
-import { api, getApiError } from "../lib/api";
-import { useAuth } from "../auth/authContext";
+import Icon from "../components/Icon";
+import ChatMessage from "../components/chat/ChatMessage";
+import { useAgentChat } from "../hooks/useAgentChat";
 import "./AgentPage.css";
 
-type Message = {
-  id: string;
-  role: "user" | "assistant";
-  text: string;
-  fallback?: boolean;
-};
-type Conversation = { id: string; title: string; messages: Message[] };
-type IconName =
-  | "chat"
-  | "book"
-  | "spark"
-  | "send"
-  | "copy"
-  | "plus"
-  | "menu"
-  | "close"
-  | "sun"
-  | "moon";
-
-function isMessage(value: unknown): value is Message {
-  if (typeof value !== "object" || value === null) return false;
-  const message = value as Record<string, unknown>;
-  return (
-    typeof message.id === "string" &&
-    (message.role === "user" || message.role === "assistant") &&
-    typeof message.text === "string" &&
-    (message.fallback === undefined || typeof message.fallback === "boolean")
-  );
-}
-
-function isConversation(value: unknown): value is Conversation {
-  if (typeof value !== "object" || value === null) return false;
-  const conversation = value as Record<string, unknown>;
-  return (
-    typeof conversation.id === "string" &&
-    typeof conversation.title === "string" &&
-    Array.isArray(conversation.messages) &&
-    conversation.messages.every(isMessage)
-  );
-}
-
-function loadConversations(storageKey: string): Conversation[] {
-  try {
-    const saved: unknown = JSON.parse(localStorage.getItem(storageKey) ?? "[]");
-    return Array.isArray(saved) ? saved.filter(isConversation) : [];
-  } catch {
-    return [];
-  }
-}
-
-function Icon({ name }: { name: IconName }) {
-  const paths: Record<IconName, string> = {
-    sun: "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5",
-    moon: "M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z",
-    chat: "M21 11a8 8 0 0 1-8 8H8l-5 3V11a9 9 0 0 1 18 0Z",
-    book: "M12 5v16m0-16C9 3 5 3 2 4v15c3-1 7-1 10 2 3-3 7-3 10-2V4c-3-1-7-1-10 1Z",
-    spark: "m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z",
-    send: "M12 19V5m-6 6 6-6 6 6",
-    copy: "M9 9h12v12H9V9ZM15 5V3H3v12h2",
-    plus: "M12 5v14M5 12h14",
-    menu: "M4 6h16M4 12h16M4 18h16",
-    close: "m6 6 12 12M6 18 18 6",
-  };
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d={paths[name]} />
-    </svg>
-  );
-}
 export default function AgentPage() {
-  const { user, logout } = useAuth();
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    try {
-      return localStorage.getItem("bnbgrace-theme") === "dark"
-        ? "dark"
-        : "light";
-    } catch {
-      return "light";
-    }
-  });
-  useEffect(() => {
-    try {
-      localStorage.setItem("bnbgrace-theme", theme);
-    } catch {
-      /* Theme still works when browser storage is unavailable. */
-    }
-  }, [theme]);
-  const chatStorageKey = `bnbgrace-chats-${user?.id ?? "guest"}`;
-  const [chats, setChats] = useState<Conversation[]>(() =>
-    loadConversations(chatStorageKey),
-  );
-  useEffect(() => {
-    try {
-      localStorage.setItem(chatStorageKey, JSON.stringify(chats));
-    } catch {
-      /* Recent chats remain available until the page is closed. */
-    }
-  }, [chatStorageKey, chats]);
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [question, setQuestion] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [failedQuestion, setFailedQuestion] = useState("");
-  const [copyStatus, setCopyStatus] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const busy = useRef(false);
-  const input = useRef<HTMLTextAreaElement>(null);
-  const end = useRef<HTMLDivElement>(null);
-  const active = chats.find((chat) => chat.id === activeId);
-  const messages = active?.messages ?? [];
-
-  useEffect(() => {
-    end.current?.scrollIntoView({ behavior: "auto", block: "end" });
-  }, [chats, loading, activeId, error]);
-  useEffect(() => {
-    if (input.current) {
-      input.current.style.height = "auto";
-      input.current.style.height = `${Math.min(input.current.scrollHeight, 160)}px`;
-    }
-  }, [question]);
-  useEffect(() => {
-    function close(event: KeyboardEvent) {
-      if (event.key === "Escape") setSidebarOpen(false);
-    }
-    window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
-  }, []);
-
-  function newChat() {
-    if (busy.current) return;
-    setActiveId(null);
-    setQuestion("");
-    setError("");
-    setFailedQuestion("");
-    setCopyStatus("");
-    setSidebarOpen(false);
-    input.current?.focus();
-  }
-  function selectChat(id: string) {
-    if (busy.current) return;
-    setActiveId(id);
-    setQuestion("");
-    setError("");
-    setFailedQuestion("");
-    setCopyStatus("");
-    setSidebarOpen(false);
-  }
-  async function send(text: string, retry = false) {
-    const trimmed = text.trim();
-    if (!trimmed || busy.current) return;
-    busy.current = true;
-    const chatId = activeId ?? crypto.randomUUID();
-    const userMessage: Message = {
-      id: crypto.randomUUID(),
-      role: "user",
-      text: trimmed,
-    };
-    if (!activeId) {
-      setChats((previous) => [
-        { id: chatId, title: trimmed, messages: [userMessage] },
-        ...previous,
-      ]);
-      setActiveId(chatId);
-    } else if (!retry) {
-      setChats((previous) =>
-        previous.map((chat) =>
-          chat.id === chatId
-            ? { ...chat, messages: [...chat.messages, userMessage] }
-            : chat,
-        ),
-      );
-    }
-    setLoading(true);
-    setQuestion("");
-    setError("");
-    setFailedQuestion("");
-    setCopyStatus("");
-    try {
-      const { data } = await api.post<{ reply: string; fallback: boolean }>(
-        "/agent/generate-reply",
-        { question: trimmed },
-      );
-      if (
-        !data ||
-        typeof data.reply !== "string" ||
-        !data.reply.trim() ||
-        typeof data.fallback !== "boolean"
-      )
-        throw new Error(
-          "The assistant returned an invalid reply. Please try again.",
-        );
-      const reply: Message = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        text: data.reply,
-        fallback: data.fallback,
-      };
-      setChats((previous) =>
-        previous.map((chat) =>
-          chat.id === chatId
-            ? { ...chat, messages: [...chat.messages, reply] }
-            : chat,
-        ),
-      );
-    } catch (cause) {
-      setError(getApiError(cause));
-      setFailedQuestion(trimmed);
-    } finally {
-      busy.current = false;
-      setLoading(false);
-      input.current?.focus();
-    }
-  }
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    void send(question);
-  }
-  async function copy(message: Message) {
-    try {
-      await navigator.clipboard.writeText(message.text);
-      setCopyStatus("Reply copied.");
-    } catch {
-      setCopyStatus(
-        "Could not copy. Select the reply text and copy it manually.",
-      );
-    }
-  }
+  const {
+    user,
+    logout,
+    theme,
+    setTheme,
+    chats,
+    activeId,
+    question,
+    setQuestion,
+    loading,
+    error,
+    failedQuestion,
+    copyStatus,
+    sidebarOpen,
+    setSidebarOpen,
+    input,
+    end,
+    messages,
+    newChat,
+    selectChat,
+    send,
+    submit,
+    copy,
+  } = useAgentChat();
 
   return (
     <div className="chat-app" data-theme={theme}>
@@ -398,36 +185,7 @@ export default function AgentPage() {
               aria-relevant="additions text"
             >
               {messages.map((message) => (
-                <article
-                  key={message.id}
-                  className={`chat-message ${message.role}`}
-                  aria-label={
-                    message.role === "user" ? "You" : "bnbgrace assistant"
-                  }
-                >
-                  {message.role === "assistant" && (
-                    <span className="message-avatar">
-                      <Icon name="spark" />
-                    </span>
-                  )}
-                  <div className="message-body">
-                    {message.role === "assistant" && (
-                      <span className="message-author">bnbgrace</span>
-                    )}
-                    {message.fallback && (
-                      <p className="chat-fallback">Needs supervisor check</p>
-                    )}
-                    <div className="message-text">{message.text}</div>
-                    {message.role === "assistant" && (
-                      <button
-                        className="message-copy"
-                        onClick={() => void copy(message)}
-                      >
-                        <Icon name="copy" /> Copy reply
-                      </button>
-                    )}
-                  </div>
-                </article>
+                <ChatMessage key={message.id} message={message} onCopy={copy} />
               ))}
               {loading && (
                 <div className="chat-message assistant">

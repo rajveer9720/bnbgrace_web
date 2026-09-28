@@ -1,119 +1,38 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { api, getApiError } from "../lib/api";
+import { useRef } from 'react';
+import { useUploadDocumentMutation, useAddUrlMutation, useAddQaMutation, useGetKnowledgeQuery, useDeleteKnowledgeMutation } from '../stores/apis/knowledgeApi';
+import { getApiError } from '../utils/api-error.util';
+import type { AddQaDto } from '../types/api';
+export type { KnowledgeSource } from '../types/api';
 
-export interface KnowledgeSource {
-  id: number;
-  type: "pdf" | "url" | "qa";
-  title: string;
-  originalRef: string;
-  createdAt: string;
-}
-
-export const knowledgeEndpoints = {
-  list: "/knowledge",
-  upload: "/knowledge/upload",
-  url: "/knowledge/url",
-  qa: "/knowledge/qa",
-  delete: (id: number) => `/knowledge/${id}`,
-};
-
-function useMutation<T>(action: (value: T) => Promise<unknown>) {
-  const [isPending, setIsPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+function useMutationResult<T>(trigger: (value: T) => { unwrap: () => Promise<unknown> }, state: { isLoading: boolean; error?: unknown }) {
   const busy = useRef(false);
-  const mutate = async (value: T) => {
+  async function mutate(value: T): Promise<boolean> {
     if (busy.current) return false;
     busy.current = true;
-    setIsPending(true);
-    setError(null);
-    try {
-      await action(value);
-      return true;
-    } catch (error) {
-      setError(getApiError(error));
-      return false;
-    } finally {
-      busy.current = false;
-      setIsPending(false);
-    }
-  };
-  return { mutate, isPending, error };
+    try { await trigger(value).unwrap(); return true; }
+    catch { return false; }
+    finally { busy.current = false; }
+  }
+  return { mutate, isPending: state.isLoading, error: state.error ? getApiError(state.error) : null };
 }
-
 export function useUploadDoc() {
-  return useMutation((file: File) => {
-    const data = new FormData();
-    data.append("file", file);
-    return api.post(knowledgeEndpoints.upload, data);
-  });
+  const [trigger, state] = useUploadDocumentMutation();
+  return useMutationResult<File>(trigger, state);
 }
-
 export function useAddUrl() {
-  return useMutation((url: string) =>
-    api.post(knowledgeEndpoints.url, { url }),
-  );
+  const [trigger, state] = useAddUrlMutation();
+  return useMutationResult<string>(url => trigger({url}), state);
 }
-
 export function useAddQa() {
-  return useMutation((data: { question: string; answer: string }) =>
-    api.post(knowledgeEndpoints.qa, data),
-  );
+  const [trigger, state] = useAddQaMutation();
+  return useMutationResult<AddQaDto>(trigger, state);
 }
-
 export function useKnowledgeList() {
-  const [sources, setSources] = useState<KnowledgeSource[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const requestId = useRef(0);
-  const refresh = useCallback(async () => {
-    const current = ++requestId.current;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const { data } = await api.get(knowledgeEndpoints.list);
-      const rows = Array.isArray(data) ? data : data?.knowledge_sources;
-      if (
-        !Array.isArray(rows) ||
-        !rows.every(
-          (row) =>
-            row && typeof row.id === "number" && typeof row.title === "string",
-        )
-      ) {
-        throw new Error(
-          "The API did not return knowledge sources. The backend list endpoint needs to return a source array.",
-        );
-      }
-      if (current === requestId.current) setSources(rows);
-    } catch (error) {
-      if (current === requestId.current) setError(getApiError(error));
-    } finally {
-      if (current === requestId.current) setIsLoading(false);
-    }
-  }, []);
-  const invalidate = useCallback(() => {
-    requestId.current++;
-  }, []);
-  useEffect(() => {
-    let active = true;
-    queueMicrotask(() => {
-      if (active) void refresh();
-    });
-    return () => {
-      active = false;
-      invalidate();
-    };
-  }, [refresh, invalidate]);
-  const deletion = useMutation(async (id: number) => {
-    await api.delete(knowledgeEndpoints.delete(id));
-    await refresh();
-  });
-  return {
-    sources,
-    isLoading,
-    error,
-    refresh,
-    deleteSource: deletion.mutate,
-    isDeleting: deletion.isPending,
-    deleteError: deletion.error,
-  };
+  const query = useGetKnowledgeQuery();
+  const [trigger, state] = useDeleteKnowledgeMutation();
+  const deletion = useMutationResult<number>(trigger, state);
+  return { sources: query.data ?? [], isLoading: query.isFetching,
+    error: query.error ? getApiError(query.error) : null,
+    refresh: async () => { await query.refetch(); },
+    deleteSource: deletion.mutate, isDeleting: deletion.isPending, deleteError: deletion.error };
 }

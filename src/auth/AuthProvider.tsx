@@ -1,12 +1,16 @@
-import { useEffect, useState } from "react";
+import { useSelector } from 'react-redux';
+import type { RootState } from '../stores';
+import { setUser, setAuthLoading } from '../stores/slices/authSlice';
+import { store } from '../stores';
+import { api } from '../stores/apis/baseApi';
+import { useEffect } from "react";
 import type { ReactNode } from "react";
-import { authenticate, getTokenRole, verifyToken } from "./authService";
+import { authenticate, verifyToken } from "./authService";
+import { getTokenRole } from '../utils/token.util';
 import { AuthContext } from "./authContext";
-import type { AuthUser } from "./authContext";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, isLoading } = useSelector((state: RootState) => state.auth);
 
   useEffect(() => {
     let active = true;
@@ -15,7 +19,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!token || !role) {
       localStorage.removeItem("accessToken");
       queueMicrotask(() => {
-        if (active) setIsLoading(false);
+        if (active) store.dispatch(setAuthLoading(false));
       });
       return () => {
         active = false;
@@ -23,13 +27,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     void verifyToken(token, role)
       .then((verifiedUser) => {
-        if (active) setUser(verifiedUser);
+        if (active) store.dispatch(setUser(verifiedUser));
       })
       .catch(() => {
         if (active) localStorage.removeItem("accessToken");
       })
       .finally(() => {
-        if (active) setIsLoading(false);
+        if (active) store.dispatch(setAuthLoading(false));
       });
     return () => {
       active = false;
@@ -39,7 +43,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     function clearExpiredSession() {
       localStorage.removeItem("accessToken");
-      setUser(null);
+      store.dispatch(api.util.resetApiState());
+      store.dispatch(setUser(null));
       window.history.replaceState({}, "", "/login");
     }
     window.addEventListener("auth:unauthorized", clearExpiredSession);
@@ -49,19 +54,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function login(email: string, password: string) {
     const verifiedUser = await authenticate("/auth/login", email, password);
-    setUser(verifiedUser);
+    store.dispatch(setUser(verifiedUser));
     return verifiedUser;
   }
 
   async function registerAgent(email: string, password: string) {
     const verifiedUser = await authenticate("/auth/register", email, password);
-    setUser(verifiedUser);
+    store.dispatch(setUser(verifiedUser));
     return verifiedUser;
   }
 
   function logout() {
     localStorage.removeItem("accessToken");
-    setUser(null);
+    store.dispatch(api.util.resetApiState());
+    store.dispatch(setUser(null));
     window.history.replaceState({}, "", "/login");
   }
 

@@ -5,7 +5,10 @@ import type { KnowledgeFormProps } from "./types";
 
 const MAX_PDF_SIZE = 20_000_000;
 
-export default function DocumentForm({ onStart, onSuccess }: KnowledgeFormProps) {
+export default function DocumentForm({
+  onStart,
+  onSuccess,
+}: KnowledgeFormProps) {
   const upload = useUploadDoc();
   const [fileError, setFileError] = useState("");
 

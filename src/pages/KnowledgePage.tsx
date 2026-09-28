@@ -19,7 +19,6 @@ export default function KnowledgePage() {
     if (!success) return;
     form.reset();
     setNotice(message);
-    await list.refresh();
   }
 
   async function deleteSource(id: number) {

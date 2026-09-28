@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { api, getApiError } from "../lib/api";
+import { useGenerateReplyMutation } from "../stores/apis/agentApi";
+import { getApiError } from "../utils/api-error.util";
 import { useAuth } from "../auth/authContext";
 import { loadConversations } from "../lib/conversations";
 import type { Conversation, Message } from "../lib/conversations";
 
 export function useAgentChat() {
+  const [generateReply] = useGenerateReplyMutation();
   const { user, logout } = useAuth();
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     try {
@@ -114,10 +116,7 @@ export function useAgentChat() {
     setFailedQuestion("");
     setCopyStatus("");
     try {
-      const { data } = await api.post<{ reply: string; fallback: boolean }>(
-        "/agent/generate-reply",
-        { question: trimmed },
-      );
+      const data = await generateReply({ question: trimmed }).unwrap();
       if (
         !data ||
         typeof data.reply !== "string" ||
